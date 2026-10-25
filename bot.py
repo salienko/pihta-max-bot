@@ -56,7 +56,7 @@ async def main():
     task = None
     try:
         async with store.pool.acquire() as lock:
-            if not await lock.fetchval('SELECT pg_try_advisory_lock(7319842)'):
+            if not await lock.fetchval('SELECT pg_try_advisory_lock(7319850)'):
                 raise SystemExit('Another bot instance is running.')
         ui = BookingUI(settings, store)
 

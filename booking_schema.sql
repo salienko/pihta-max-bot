@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS profiles(telegram_id bigint PRIMARY KEY, name text NO
 CREATE TABLE IF NOT EXISTS drafts(telegram_id bigint PRIMARY KEY,token text NOT NULL UNIQUE,state text NOT NULL,data jsonb NOT NULL,revision integer NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS bookings(
  id text PRIMARY KEY, draft_token text NOT NULL UNIQUE, telegram_id bigint NOT NULL,
+ platform text NOT NULL DEFAULT 'telegram',
  starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL, blocked_until timestamptz NOT NULL,
  data jsonb NOT NULL, estimate jsonb NOT NULL, rules_hash text NOT NULL, created_at timestamptz NOT NULL,
  status text NOT NULL CHECK(status IN ('pending','confirmed','cancelled','rejected','expired','completed')),

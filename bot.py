@@ -1,11 +1,13 @@
 """MAX adapter for the current Telegram booking v3 branch."""
 import asyncio, hashlib, hmac, logging, os
+from dataclasses import replace
 from aiohttp import web
 from maxapi import MaxApi
 from transport_v3 import MaxMessage, MaxCallback, InlineKeyboardMarkup, InlineKeyboardButton, markup_attachments
 from settings import load
 from booking_store import BookingStore
 from booking_ui import BookingUI
+from paykeeper import mount as mount_paykeeper
 
 async def deliver_once(api, store):
     row = await store.next_delivery()
@@ -51,13 +53,26 @@ async def worker(api, store):
             logging.error('Background job failed: %s', type(exc).__name__)
         await asyncio.sleep(10)
 
+async def paykeeper_worker(store):
+    while True:
+        try:
+            await store.invoice_once()
+            await store.reserve_once()
+            await store.poll_once()
+            await store.receipt_once()
+        except Exception as exc:
+            logging.error('PayKeeper worker failed: %s', type(exc).__name__)
+        await asyncio.sleep(2)
+
 async def main():
     settings = load()
+    settings = replace(settings, admin_ids=(int(os.getenv('OWNER_MAX_ID', '0')),), web_url=os.getenv('WEB_BASE_URL', '').strip().rstrip('/'))
     if not settings.token or not settings.admin_ids or not settings.database_url:
         raise SystemExit('Configure MAX_BOT_TOKEN/BOT_TOKEN, DATABASE_URL and OWNER_MAX_ID.')
     api = MaxApi(settings.token)
     store = await BookingStore.connect(settings)
     task = None
+    pay_task = None
     try:
         async with store.pool.acquire() as lock:
             if not await lock.fetchval('SELECT pg_try_advisory_lock(7319850)'):
@@ -105,16 +120,20 @@ async def main():
         app.router.add_get('/health', health)
         app.router.add_head('/webhook', webhook)
         app.router.add_post('/webhook', webhook)
+        mount_paykeeper(app, store, settings)
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', '3000'))).start()
         task = asyncio.create_task(worker(api, store))
-        logging.info('Pihta booking v3 MAX ready; shared-schema adapter')
+        if settings.paykeeper_enabled:
+            pay_task = asyncio.create_task(paykeeper_worker(store))
+        logging.info('Pihta booking v3 MAX ready; shared-schema adapter; paykeeper=%s', settings.paykeeper_enabled)
         while True:
             await asyncio.sleep(3600)
     finally:
-        if task:
-            task.cancel()
+        for current in (pay_task, task):
+            if current:
+                current.cancel()
         await store.pool.close()
         await api.close()
 

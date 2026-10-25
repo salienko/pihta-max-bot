@@ -30,7 +30,7 @@ class BookingStore(ReserveStore,StaffBookingStore,FinalReceiptStore,PayKeeperSto
     def __init__(self,settings,pool):
         self.settings,self.pool=settings,pool
         self.platform=os.getenv('BOT_PLATFORM','max')
-
+        self.admin_ids=tuple(int(x) for x in os.getenv('PLATFORM_ADMIN_IDS','').split(',') if x.strip()) or settings.admin_ids
     @classmethod
     async def connect(cls,settings,schema=SCHEMA):
         if not re.fullmatch('[a-z][a-z0-9_]{0,62}',schema):raise ValueError('Invalid schema')
@@ -171,7 +171,7 @@ class BookingStore(ReserveStore,StaffBookingStore,FinalReceiptStore,PayKeeperSto
             if any(r['starts_at'].astimezone(TZ).date()==start.astimezone(TZ).date() for r in rows):raise RuleError('На эту дату у вас уже есть бронь. Выберите другую дату.')
             if await self.blocked(db,start,end+timedelta(hours=1)):raise RuleError('Это время уже занято. Выберите другой сеанс.')
             ident=secrets.token_hex(5).upper()
-            await db.execute("INSERT INTO bookings(id,draft_token,telegram_id,starts_at,ends_at,blocked_until,data,estimate,rules_hash,created_at,status) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,'pending')",ident,token,actor,start,end,end+timedelta(hours=1),json.dumps(data,ensure_ascii=False),json.dumps(q,ensure_ascii=False),self.settings.rules_hash,clock)
+            await db.execute("INSERT INTO bookings(id,draft_token,telegram_id,platform,starts_at,ends_at,blocked_until,data,estimate,rules_hash,created_at,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,'pending')",ident,token,actor,self.platform,start,end,end+timedelta(hours=1),json.dumps(data,ensure_ascii=False),json.dumps(q,ensure_ascii=False),self.settings.rules_hash,clock)
             await db.execute('INSERT INTO profiles VALUES($1,$2,$3) ON CONFLICT(telegram_id) DO UPDATE SET name=$2,phone=$3',actor,data['name'],data['phone'])
             await db.execute("UPDATE drafts SET state='submitted',revision=revision+1 WHERE telegram_id=$1",actor)
             row=unpack(await db.fetchrow('SELECT * FROM bookings WHERE id=$1',ident))

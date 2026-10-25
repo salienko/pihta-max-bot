@@ -46,7 +46,8 @@ def report_error(scope):
     exc = sys.exc_info()[1]
     frames = traceback.extract_tb(sys.exc_info()[2])
     location = ' > '.join(f'{Path(f.filename).name}:{f.lineno}:{f.name}' for f in frames[-5:])
-    logging.error('%s failed: %s at %s; values suppressed', scope, type(exc).__name__, location)
+    detail = f'; MAX API {getattr(exc, "status", "")} {getattr(exc, "code", "")}' if type(exc).__name__ == 'MaxApiError' else ''
+    logging.error('%s failed: %s at %s%s; values suppressed', scope, type(exc).__name__, location, detail)
 
 
 def shop():

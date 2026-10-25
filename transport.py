@@ -94,7 +94,8 @@ TEL_RE = re.compile(r'TEL[^:\n]*:([+\d()\s\-]+)')
 class MaxMessage:
     """Wraps an incoming MAX message; sends/edits through the MaxApi client."""
 
-    def __init__(self, api, raw_message, *, banner_token_cache=None):
+    def __init__(self, api, raw_message, *, banner_token_cache=None,
+                 reply_user_id=None):
         self.api = api
         self.raw = raw_message
         body = raw_message.get('body') or {}
@@ -105,8 +106,17 @@ class MaxMessage:
         sender = raw_message.get('sender') or {}
         self.from_user = _User(sender.get('user_id'))
         self.chat = _Chat(recipient.get('chat_type', 'dialog'))
-        self.chat_id = recipient.get('chat_id')
-        self.recipient_user_id = recipient.get('user_id') or sender.get('user_id')
+        # In dialogs the recipient of an incoming message is the bot itself;
+        # replies must go to the sender. reply_user_id overrides for callbacks.
+        if reply_user_id is not None:
+            self.recipient_user_id = reply_user_id
+            self.chat_id = recipient.get('chat_id')
+        elif recipient.get('chat_type') == 'dialog':
+            self.recipient_user_id = sender.get('user_id')
+            self.chat_id = None
+        else:
+            self.recipient_user_id = recipient.get('user_id')
+            self.chat_id = recipient.get('chat_id')
         self._banner_cache = banner_token_cache
         attachments = body.get('attachments') or []
         self.photo = next((a for a in attachments if a.get('type') == 'image'), None)
@@ -184,7 +194,8 @@ class MaxCallback:
         raw_message = update.get('message')
         if raw_message:
             self.message = MaxMessage(api, raw_message,
-                                      banner_token_cache=banner_token_cache)
+                                      banner_token_cache=banner_token_cache,
+                                      reply_user_id=user.get('user_id'))
 
     async def answer(self, text=None, show_alert=False):
         if self.callback_id:

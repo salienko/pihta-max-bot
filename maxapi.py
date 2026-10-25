@@ -132,19 +132,20 @@ class MaxApi:
             raise ValueError('bad upload type')
         endpoint = await self._request('POST', '/uploads',
                                        params={'type': media_type})
-        upload_url = endpoint['url']
-        s = await self.session()
-        form = aiohttp.FormData()
-        form.add_field('data', payload, filename=filename)
-        async with s.post(upload_url, data=form) as resp:
-            await resp.read()
-            if resp.status != 200:
-                raise MaxApiError(resp.status, 'upload.failed', f'status {resp.status}')
-            token = None
-            try:
-                token = (await resp.json(content_type=None)).get('token')
-            except Exception:
-                token = None
+        token = endpoint.get('token')
+        if not token:
+            upload_url = endpoint['url']
+            s = await self.session()
+            form = aiohttp.FormData()
+            form.add_field('data', payload, filename=filename)
+            async with s.post(upload_url, data=form) as resp:
+                await resp.read()
+                if resp.status != 200:
+                    raise MaxApiError(resp.status, 'upload.failed', f'status {resp.status}')
+                try:
+                    token = (await resp.json(content_type=None)).get('token')
+                except Exception:
+                    token = None
         if not token:
             raise MaxApiError(502, 'upload.token.missing', 'no token after upload')
         return {'type': media_type, 'payload': {'token': token}}

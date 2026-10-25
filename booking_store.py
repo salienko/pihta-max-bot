@@ -41,6 +41,8 @@ class BookingStore(ReserveStore,StaffBookingStore,FinalReceiptStore,PayKeeperSto
                     await db.execute('SELECT pg_advisory_xact_lock($1)',LOCK)
                     await db.execute(f'CREATE SCHEMA IF NOT EXISTS {schema}')
                     await db.execute(Path(__file__).with_name('booking_schema.sql').read_text(encoding='utf-8'))
+                    await db.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS platform text NOT NULL DEFAULT 'telegram'")
+                    await db.execute("ALTER TABLE outbox ADD COLUMN IF NOT EXISTS platform text NOT NULL DEFAULT 'telegram'")
         except BaseException:
             await pool.close();raise
         return cls(settings,pool)

@@ -41,8 +41,12 @@ async def worker(api, store):
                     break
             if asyncio.get_running_loop().time() - last_backup >= 21600:
                 from backup import snapshot
-                await snapshot(store.settings.database_url, os.getenv('BACKUP_DIR', '/app/data/backups'))
-                last_backup = asyncio.get_running_loop().time()
+                try:
+                    await snapshot(store.settings.database_url, os.getenv('BACKUP_DIR', '/app/data/backups'))
+                    last_backup = asyncio.get_running_loop().time()
+                except Exception as exc:
+                    logging.error('Backup failed: %s; retrying in 6 hours', type(exc).__name__)
+                    last_backup = asyncio.get_running_loop().time()
         except Exception as exc:
             logging.error('Background job failed: %s', type(exc).__name__)
         await asyncio.sleep(10)

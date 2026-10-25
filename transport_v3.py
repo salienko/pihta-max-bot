@@ -98,7 +98,12 @@ class MaxMessage:
         return await self.api.send(user_id=self.recipient_user_id, chat_id=self.chat_id, text=caption, attachments=attachments or None)
 
     async def edit_text(self, text, reply_markup=None):
-        return await self.api.edit(self.message_id, text=text, attachments=markup_attachments(reply_markup))
+        try:
+            return await self.api.edit(self.message_id, text=text, attachments=markup_attachments(reply_markup))
+        except Exception as exc:
+            if getattr(exc, 'status', None) in (400, 404):
+                raise TelegramBadRequest(method=None, message='message to edit not found') from exc
+            raise
 
     async def edit_caption(self, caption, reply_markup=None):
         return await self.edit_text(caption, reply_markup)
@@ -127,7 +132,10 @@ class MaxCallback:
 
 
 class TelegramBadRequest(Exception):
-    pass
+    def __init__(self, method=None, message=''):
+        self.method = method
+        self.message = message
+        super().__init__(message)
 
 
 class FSInputFile:

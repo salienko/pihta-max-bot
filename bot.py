@@ -830,5 +830,8 @@ if __name__ == '__main__':
     MaxApi.quiet_loggers()
     try:
         asyncio.run(main())
-    except Exception:
+    except SystemExit:
+        raise
+    except Exception as e:
+        logging.error('Startup failed: %s: %s', type(e).__name__, str(e)[:300])
         raise SystemExit('Бот остановлен из-за ошибки; секреты скрыты.') from None

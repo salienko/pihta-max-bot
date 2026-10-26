@@ -309,7 +309,10 @@ class BookingUI:
                         if str(entity.type)=='text_link' and entity.url:url=entity.url;break
                     await self.store.link_payment(actor,reply.message_id,url)
                     await m.answer('🔗 Ссылка передана гостю. После проверки поступления нажмите кнопку подтверждения в запросе.');return
-            if text in ('/start','/menu','Главное меню','🏠 Главное меню'):
+            if text.startswith('/start'):
+                await m.answer('Главное меню',reply_markup=ReplyKeyboardRemove())
+                await self.home(m,actor);return
+            if text in ('/menu','Главное меню','🏠 Главное меню'):
                 await m.answer('Главное меню',reply_markup=ReplyKeyboardRemove())
                 await self.home(m,actor);return
             if text=='/id':await m.answer(str(actor));return
